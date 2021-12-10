@@ -31,12 +31,15 @@ interface SignLocationState {
 }
 
 export default function SignTransaction(): ReactElement {
+  console.log("hai")
   const areKeyringsUnlocked = useAreKeyringsUnlocked(true)
 
   const history = useHistory()
   const dispatch = useBackgroundDispatch()
-  const location = useLocation<SignLocationState>()
-  const { assetSymbol, amount, signType } = location.state
+  const location = useLocation<SignLocationState | undefined>()
+  const { assetSymbol, amount, signType } = location.state ?? {
+    signType: SignType.Sign,
+  }
   const isTransactionDataReady = useBackgroundSelector(
     selectIsTransactionLoaded
   )
@@ -69,7 +72,10 @@ export default function SignTransaction(): ReactElement {
     [SignType.Sign]: {
       title: "Sign Transaction",
       component: () => (
-        <SignTransactionSignBlock token={assetSymbol} amount={amount} />
+        <SignTransactionSignBlock
+          token={assetSymbol ?? ""}
+          amount={amount ?? 0}
+        />
       ),
       confirmButtonText: "Sign",
     },

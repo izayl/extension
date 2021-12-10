@@ -5,9 +5,11 @@ import {
 } from "@tallyho/provider-bridge-shared"
 import TallyWindowProvider from "@tallyho/window-provider"
 
-const enabled = window.localStorage.getItem(WINDOW_PROVIDER_FLAG)
+const windowProviderEnabled = process.env.ENABLE_WINDOW_PROVIDER === "true"
+const windowProviderDefaultEnabled =
+  process.env.ENABLE_WINDOW_PROVIDER_DEFAULT === "true"
 
-if (enabled === "true") {
+if (windowProviderEnabled) {
   // The window object is considered unsafe, because other extensions could have modified them before this script is run.
   // For 100% certainty we could create an iframe here, store the references and then destoroy the iframe.
   //   something like this: https://speakerdeck.com/fransrosen/owasp-appseceu-2018-attacking-modern-web-technologies?slide=95
@@ -20,5 +22,10 @@ if (enabled === "true") {
       window.removeEventListener("message", fn, false),
     origin: window.location.origin,
   })
-  window.ethereum = window.tally
+
+  if (windowProviderDefaultEnabled) {
+    window.ethereum = window.tally
+    // @ts-expect-error boom
+    window.metamask = window.tally
+  }
 }

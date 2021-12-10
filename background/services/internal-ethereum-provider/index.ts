@@ -2,13 +2,24 @@ import browser from "webextension-polyfill"
 import { INTERNAL_PORT_NAME, RPCRequest } from "@tallyho/provider-bridge-shared"
 import {
   ChainService,
+  KeyringService,
   ServiceCreatorFunction,
   ServiceLifecycleEvents,
 } from ".."
 import logger from "../../lib/logger"
 import BaseService from "../base"
+import { EIP1559TransactionRequest, SignedEVMTransaction } from "../../networks"
+
+type DAppRequestEvent<T, E> = {
+  payload: T
+  resolver: (result: E | PromiseLike<E>) => void
+}
 
 type Events = ServiceLifecycleEvents & {
+  transactionSignatureRequest: DAppRequestEvent<
+    EIP1559TransactionRequest,
+    SignedEVMTransaction
+  >
   // connect
   // disconnet
   // account change
@@ -98,9 +109,14 @@ export default class InternalEthereumProviderService extends BaseService<Events>
         return this.chainService
           .getAccountsToTrack()
           .then(([account]) => [account.address])
-      case "eth_sign": // --- important wallet methods ---
       case "eth_sendTransaction":
+        return this.signTransaction(
+          params[0] as EIP1559TransactionRequest
+        ).then((signed) => this.chainService.broadcastSignedTransaction(signed))
       case "eth_signTransaction":
+        // FIXME Convert to standard Ethereum signed tx string.
+        return this.signTransaction(params[0] as EIP1559TransactionRequest)
+      case "eth_sign": // --- important wallet methods ---
       case "metamask_getProviderState": // --- important MM only methods ---
       case "metamask_sendDomainMetadata":
       case "wallet_requestPermissions":
@@ -132,5 +148,14 @@ export default class InternalEthereumProviderService extends BaseService<Events>
       default:
         throw new Error(`unsupported method: ${method}`)
     }
+  }
+
+  private async signTransaction(transactionRequest: EIP1559TransactionRequest) {
+    return new Promise<SignedEVMTransaction>((resolve) => {
+      this.emitter.emit("transactionSignatureRequest", {
+        payload: transactionRequest,
+        resolver: resolve,
+      })
+    })
   }
 }

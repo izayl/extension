@@ -78,9 +78,9 @@ export default class ProviderBridgeService extends BaseService<Events> {
     return async (event: PortRequestEvent) => {
       // a port: browser.Runtime.Port is passed into this function as a 2nd argument by the port.onMessage.addEventListener.
       // This contradicts the MDN documentation so better not to rely on it.
-      logger.log(
+      /*logger.log(
         `background: request payload: ${JSON.stringify(event.request)}`
-      )
+      )*/
 
       if (
         event.request.method === "eth_requestAccounts" &&
@@ -103,12 +103,18 @@ export default class ProviderBridgeService extends BaseService<Events> {
       // According to EIP-1193 it should return a `4100` ProviderRPCError but felt that dApps probably does not expect this.
       const response: PortResponseEvent = { id: event.id, result: [] }
       if (await this.permissionCheck(url)) {
+        if (event.request.method === "eth_sendTransaction") {
+          logger.error("Showin")
+          await ProviderBridgeService.showDappConnectWindow("/signTransaction")
+        }
+
+        console.log("awaiting", event.request.method)
         response.result = await this.routeContentScriptRPCRequest(
           event.request.method,
           event.request.params
         )
       }
-      logger.log("background response:", response)
+      console.log("background response:", event.request.method, response)
 
       port.postMessage(response)
     }
@@ -121,7 +127,7 @@ export default class ProviderBridgeService extends BaseService<Events> {
     })
 
     this.emitter.emit("permissionRequest", permissionRequest)
-    await ProviderBridgeService.showDappConnectWindow()
+    await ProviderBridgeService.showDappConnectWindow("/permission")
 
     // ts compiler does not know that we assign value to blockResolve so we need to tell him
     this.#pendingPermissionsRequests[permissionRequest.url] = blockResolve!
@@ -168,13 +174,14 @@ export default class ProviderBridgeService extends BaseService<Events> {
     }
   }
 
-  static async showDappConnectWindow(): Promise<browser.Windows.Window> {
+  static async showDappConnectWindow(
+    url: string
+  ): Promise<browser.Windows.Window> {
     const { left = 0, top, width = 1920 } = await browser.windows.getCurrent()
     const popupWidth = 400
     const popupHeight = 600
-    const internalPageName = "permission"
     return browser.windows.create({
-      url: `${browser.runtime.getURL("popup.html")}?page=${internalPageName}`,
+      url: `${browser.runtime.getURL("popup.html")}?page=${url}`,
       type: "popup",
       left: left + width - popupWidth,
       top,
